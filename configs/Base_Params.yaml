@@ -11,17 +11,28 @@ dataset:
     base_dir:
 training: 
     lr: 0.0001
-    weight_decay: 0.001
-    weight_D: 5  # 6.0, 4.0, 1.0
-    weight_P: 200.0
+    weight_decay: 0.01
+    weight_D: 0.1  # 6.0, 4.0, 1.0
+    weight_P: 20.0
     weight_close: 1.0
     weight_push: 30.0
     push_margin: 0.1
     distance_error_alpha: 0.3
-    batch_size: 8192  # Reduced from 2048 for high-dimensional data
-    num_epochs: 30
-    eval_interval: 1000
+    batch_size: 2048  # Reduced from 2048 for high-dimensional data
+    num_epochs: 60
+    eval_interval: 2000
     weight_gate: -1.0  # Disabled
-model: 
+metrics: 
     metric: "euclidean"
-    metric_loss": "additivity"  # Can be "additivity", "triplet", or "quadruplet"
+    metric_loss: "additivity"  # Can be "additivity", "triplet", or "quadruplet"
+model: 
+    proj_dim: 1024
+    output_dim: 128
+    hidden_dim: 1024
+    num_heads: 2
+    num_layers: 8
+    dropout_data: 0.1
+    dropout_metric: 0.1
+    norm_method: None
+    gate_type: "none" # No gating for this example
+    cell_encoder:

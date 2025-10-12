@@ -96,7 +96,7 @@ def check_embedding(get_node_mtx, model, dist_metric, device):
         return embeddings, dm, node_names
     
 
-def create_model(input_dim, device="cpu"):
+def create_model(input_dim, config=None, device="cpu"):
     """
     Create the CellTreeQMAttention model with config parameters.
 
@@ -107,19 +107,18 @@ def create_model(input_dim, device="cpu"):
     Returns:
         CellTreeQMAttention: The initialized model.
     """
-    # Model configuration from the config file
-    config = {
-        "proj_dim": 1024,
-        "output_dim": 128,
-        "hidden_dim": 1024,
-        "num_heads": 2,
-        "num_layers": 8,
-        "dropout_data": 0.1,
-        "dropout_metric": 0.1,
-        "norm_method": None,
-        "gate_type": "none",  # No gating for this example
-    }
-
+    if config is None: # default config. Can be removed if always passing config
+        config = {
+            "proj_dim": 512,
+            "output_dim": 128,
+            "hidden_dim": 512,
+            "num_heads": 2,
+            "num_layers": 4,
+            "dropout_data": 0.2,
+            "dropout_metric": 0.2,
+            "norm_method": None,
+            "gate_type": "none",  # No gating for this example
+        }
     model = CellTreeQMAttention(
         input_dim=input_dim,
         hidden_dim=config["hidden_dim"],
@@ -180,8 +179,8 @@ def train_one_epoch(
     weight_close = config["training"]["weight_close"]
     weight_push = config["training"]["weight_push"]
     push_margin = config["training"]["push_margin"]
-    dist_metric = config["training"]["metric"]
-    metric_loss_type = config["training"]["metric_loss"]
+    dist_metric = config["metrics"]["metric"]
+    metric_loss_type = config["metrics"]["metric_loss"]
     distance_alpha = config["training"].get("distance_error_alpha", 0.5)
 
     # Calculate max_step like in research codebase
@@ -414,7 +413,7 @@ def evaluate_model(model, dataset, config, device="cpu", dataset_name="train", g
         for i, get_node_mtx in enumerate(dataset.get_node_mtx()):
             # Get embeddings and distance matrix
             embeddings, emb_dm, node_names = check_embedding(
-                get_node_mtx, model, config["model"]["metric"], device
+                get_node_mtx, model, config["metrics"]["metric"], device
             )
 
                 # Reconstruct tree from embedding
@@ -449,7 +448,7 @@ def evaluate_model(model, dataset, config, device="cpu", dataset_name="train", g
                 .to(device)
                 )
             trans_pts_mtx = model(pts_mtx)
-            dm = pairwise_distances(trans_pts_mtx, metric=config["model"]["metric"]).to(device)
+            dm = pairwise_distances(trans_pts_mtx, metric=config["metrics"]["metric"]).to(device)
             dm_ref = dataset.ref_dm[i].unsqueeze(0).to(device)
 
             # Generate quartets for evaluation
@@ -611,7 +610,6 @@ def main():
     out_dir = f"{base_dir}/examples/out/phylogenetic_{dataset_name}"
 
     os.makedirs(out_dir, exist_ok=True)
-
     
 
     datasets = PhyloDatasetCreator(
@@ -631,7 +629,7 @@ def main():
     results["data"] = {name: [{"leaves": node_mtx["node_mtx"].shape[0], "amino_acids": node_mtx["node_mtx"].shape[1]/22} for node_mtx in dataset.get_node_mtx()] for name, dataset in datasets_dict.items()}
     
     # Evaluate the datasets on basic NJ
-    _, avg_NJ_evals = evaluate_base(datasets_dict, evals=1, dist_metric=config["model"]["metric"], device=device, gen=gen, eval_type="basic NJ")
+    _, avg_NJ_evals = evaluate_base(datasets_dict, evals=1, dist_metric=config["metrics"]["metric"], device=device, gen=gen, eval_type="basic NJ")
 
     logging.info(
                     f"Base evaluations: "
@@ -648,8 +646,8 @@ def main():
     
 
     # Evaluate the datasets on random shuffle and embedding
-    _, avg_random_shuffled_evals = evaluate_base(datasets_dict, evals = 3, dist_metric=config["model"]["metric"], device=device, gen=gen, eval_type="shuffle")
-    _, avg_random_embedding_evals = evaluate_base(datasets_dict, evals = 3, dist_metric=config["model"]["metric"], device=device, gen=gen, eval_type="embedding")
+    _, avg_random_shuffled_evals = evaluate_base(datasets_dict, evals = 3, dist_metric=config["metrics"]["metric"], device=device, gen=gen, eval_type="shuffle")
+    _, avg_random_embedding_evals = evaluate_base(datasets_dict, evals = 3, dist_metric=config["metrics"]["metric"], device=device, gen=gen, eval_type="embedding")
 
     # Log averages of random shuffle and random embedding evaluations
     logging.info(
@@ -691,7 +689,7 @@ def main():
 
     # Create model
     logging.info("Creating CellTreeQMAttention model...")
-    model = create_model(input_dim, str(device))
+    model = create_model(input_dim, config=config["model"], device=str(device))
 
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
